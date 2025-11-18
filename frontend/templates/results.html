@@ -1,0 +1,276 @@
+{% extends "base.html" %}
+
+{% block title %}Assessment Results - KidAptitude{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div id="resultsContainer" style="max-width: 1200px; margin: 2rem auto;">
+        <p style="text-align: center; font-size: 1.2rem;">Loading results...</p>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
+<script>
+    const sessionId = '{{ session_id }}';
+    console.log('Results page - Session ID:', sessionId);
+
+    async function loadResults() {
+        console.log('Loading results for session:', sessionId);
+        try {
+            const url = `/api/sessions/${sessionId}/results/`;
+            console.log('Fetching from:', url);
+            
+            const response = await fetch(url, {
+                credentials: 'include',
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            });
+            console.log('Results response status:', response.status);
+            
+            if (response.ok) {
+                const result = await response.json();
+                console.log('Result data:', result);
+                displayResults(result);
+            } else {
+                const errorText = await response.text();
+                console.error('Error response:', response.status, errorText);
+                document.getElementById('resultsContainer').innerHTML = 
+                    `<p style="color: var(--danger);">Failed to load results. Status: ${response.status}<br>URL: ${url}<br>Message: ${errorText}</p>`;
+            }
+        } catch (err) {
+            console.error('Error:', err);
+            document.getElementById('resultsContainer').innerHTML = 
+                `<p style="color: var(--danger);">Error loading results: ${err.message}</p>`;
+        }
+    }
+
+    function displayResults(result) {
+        const scores = result.raw_scores || {};
+        const normalized = result.normalized_scores || {};
+        const score = scores.score || 0;
+        const total = scores.total || 0;
+        const percentage = normalized.percent || 0;
+
+        let performanceLevel = 'Poor';
+        let performanceColor = '#ef4444';
+        
+        if (percentage >= 80) {
+            performanceLevel = 'Excellent';
+            performanceColor = '#10b981';
+        } else if (percentage >= 60) {
+            performanceLevel = 'Good';
+            performanceColor = '#3b82f6';
+        } else if (percentage >= 40) {
+            performanceLevel = 'Fair';
+            performanceColor = '#f59e0b';
+        }
+
+        const html = `
+            <h1 style="color: var(--primary); text-align: center; margin-bottom: 2rem;">Assessment Results</h1>
+
+            <!-- Score Summary -->
+            <div class="grid grid-2" style="margin-bottom: 2rem;">
+                <div class="card" style="text-align: center; padding: 2rem;">
+                    <div style="font-size: 3rem; font-weight: bold; color: ${performanceColor}; margin-bottom: 1rem;">
+                        ${Math.round(percentage)}%
+                    </div>
+                    <div style="font-size: 1.5rem; color: var(--text); margin-bottom: 0.5rem;">
+                        ${score}/${total} Correct
+                    </div>
+                    <div style="font-size: 1.2rem; color: ${performanceColor}; font-weight: 600;">
+                        ${performanceLevel}
+                    </div>
+                </div>
+
+                <!-- Score Chart -->
+                <div class="card" style="padding: 1.5rem;">
+                    <h3 style="margin-bottom: 1rem; color: var(--primary);">Score Distribution</h3>
+                    <canvas id="scoreChart" style="max-height: 300px;"></canvas>
+                </div>
+            </div>
+
+            <!-- Performance Metrics -->
+            <div class="grid grid-2" style="margin-bottom: 2rem;">
+                <div class="card" style="padding: 1.5rem;">
+                    <h3 style="margin-bottom: 1rem; color: var(--primary);">Performance Metrics</h3>
+                    <div style="display: flex; flex-direction: column; gap: 1rem;">
+                        <div>
+                            <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem;">
+                                <span style="font-weight: 600;">Accuracy</span>
+                                <span style="color: ${performanceColor}; font-weight: 600;">${Math.round(percentage)}%</span>
+                            </div>
+                            <div style="width: 100%; height: 8px; background: var(--border); border-radius: 4px; overflow: hidden;">
+                                <div style="width: ${percentage}%; height: 100%; background: ${performanceColor}; transition: width 0.3s;"></div>
+                            </div>
+                        </div>
+                        <div>
+                            <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem;">
+                                <span style="font-weight: 600;">Questions Answered</span>
+                                <span style="color: var(--primary); font-weight: 600;">${total}</span>
+                            </div>
+                            <div style="padding: 0.75rem; background: var(--light); border-radius: 0.5rem; text-align: center; font-weight: 600;">
+                                All ${total} questions answered
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Progress Ring -->
+                <div class="card" style="padding: 1.5rem;">
+                    <h3 style="margin-bottom: 1rem; color: var(--primary);">Overall Performance</h3>
+                    <canvas id="progressChart" style="max-height: 300px;"></canvas>
+                </div>
+            </div>
+
+            <!-- Answer Review -->
+            <div class="card" style="padding: 2rem; margin-bottom: 2rem;">
+                <h3 style="margin-bottom: 1.5rem; color: var(--primary);">Answer Review</h3>
+                <div id="answersList" style="display: flex; flex-direction: column; gap: 1rem;">
+                    <!-- Answers will be populated here -->
+                </div>
+            </div>
+
+            <!-- Action Buttons -->
+            <div style="display: flex; gap: 1rem; justify-content: center;">
+                <a href="/assessments/" class="btn btn-primary" style="color: white; text-decoration: none; padding: 0.875rem 2rem;">
+                    Take Another Assessment
+                </a>
+                <a href="/dashboard/" class="btn" style="color: var(--primary); border: 2px solid var(--primary); text-decoration: none; padding: 0.875rem 2rem; background: white;">
+                    Back to Dashboard
+                </a>
+            </div>
+        `;
+
+        document.getElementById('resultsContainer').innerHTML = html;
+
+        // Initialize charts after rendering
+        setTimeout(() => {
+            createScoreChart(score, total - score);
+            createProgressChart(percentage);
+            loadAnswerReview(sessionId);
+        }, 100);
+    }
+
+    function createScoreChart(correct, incorrect) {
+        const ctx = document.getElementById('scoreChart').getContext('2d');
+        new Chart(ctx, {
+            type: 'doughnut',
+            data: {
+                labels: ['Correct', 'Incorrect'],
+                datasets: [{
+                    data: [correct, incorrect],
+                    backgroundColor: ['#10b981', '#ef4444'],
+                    borderColor: ['#059669', '#dc2626'],
+                    borderWidth: 2
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: true,
+                plugins: {
+                    legend: {
+                        position: 'bottom',
+                        labels: {
+                            font: { size: 14, weight: 'bold' },
+                            padding: 15,
+                            usePointStyle: true
+                        }
+                    }
+                }
+            }
+        });
+    }
+
+    function createProgressChart(percentage) {
+        const ctx = document.getElementById('progressChart').getContext('2d');
+        const chartData = {
+            labels: ['Score', 'Remaining'],
+            datasets: [{
+                data: [percentage, 100 - percentage],
+                backgroundColor: ['#3b82f6', '#e5e7eb'],
+                borderColor: ['#1d4ed8', '#d1d5db'],
+                borderWidth: 2
+            }]
+        };
+
+        new Chart(ctx, {
+            type: 'doughnut',
+            data: chartData,
+            options: {
+                responsive: true,
+                maintainAspectRatio: true,
+                plugins: {
+                    legend: {
+                        position: 'bottom',
+                        labels: {
+                            font: { size: 14, weight: 'bold' },
+                            padding: 15,
+                            usePointStyle: true
+                        }
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                return context.label + ': ' + context.parsed + '%';
+                            }
+                        }
+                    }
+                }
+            }
+        });
+    }
+
+    async function loadAnswerReview(sessionId) {
+        try {
+            const response = await fetch(`/api/sessions/${sessionId}/results/`);
+            if (response.ok) {
+                const result = await response.json();
+                displayAnswerReview(result);
+            }
+        } catch (err) {
+            console.error('Error loading answers:', err);
+        }
+    }
+
+    function displayAnswerReview(result) {
+        const container = document.getElementById('answersList');
+        
+        if (!result.responses || result.responses.length === 0) {
+            container.innerHTML = '<p>No responses recorded.</p>';
+            return;
+        }
+
+        const html = result.responses.map((response, idx) => {
+            const isCorrect = response.correct;
+            const statusColor = isCorrect ? '#10b981' : '#ef4444';
+            const statusText = isCorrect ? '✓ Correct' : '✗ Incorrect';
+
+            return `
+                <div style="border-left: 4px solid ${statusColor}; padding: 1rem; background: var(--light); border-radius: 0.5rem;">
+                    <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 0.5rem;">
+                        <div>
+                            <div style="font-weight: 600; color: var(--dark); margin-bottom: 0.25rem;">
+                                Question ${idx + 1}
+                            </div>
+                            <div style="color: var(--text); font-size: 0.95rem;">
+                                ${response.question_text || 'Question ' + response.question}
+                            </div>
+                        </div>
+                        <div style="color: ${statusColor}; font-weight: 600; white-space: nowrap; margin-left: 1rem;">
+                            ${statusText}
+                        </div>
+                    </div>
+                </div>
+            `;
+        }).join('');
+
+        container.innerHTML = html;
+    }
+
+    // Load results on page load
+    window.addEventListener('DOMContentLoaded', loadResults);
+</script>
+{% endblock %}

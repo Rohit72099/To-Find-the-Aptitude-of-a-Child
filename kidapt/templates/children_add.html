@@ -1,0 +1,114 @@
+{% extends "base.html" %}
+
+{% block title %}Add Child - KidAptitude{% endblock %}
+
+{% block content %}
+<div class="container" style="max-width: 500px; margin: 2rem auto;">
+    <h1 style="color: var(--primary); margin-bottom: 1.5rem;">Add a New Child</h1>
+
+    <div class="card">
+        <form id="addChildForm">
+            {% csrf_token %}
+
+            <div class="form-group">
+                <label for="firstName">First Name *</label>
+                <input type="text" id="firstName" name="first_name" required aria-label="First name" placeholder="e.g., Sarah">
+            </div>
+
+            <div class="form-group">
+                <label for="lastName">Last Name</label>
+                <input type="text" id="lastName" name="last_name" aria-label="Last name" placeholder="e.g., Smith">
+            </div>
+
+            <div class="form-group">
+                <label for="dob">Date of Birth *</label>
+                <input type="date" id="dob" name="dob" required aria-label="Date of birth">
+            </div>
+
+            <div class="form-group">
+                <label for="gender">Gender</label>
+                <select id="gender" name="gender" aria-label="Gender">
+                    <option value="">Select gender</option>
+                    <option value="male">Male</option>
+                    <option value="female">Female</option>
+                    <option value="other">Other</option>
+                    <option value="prefer_not_to_say">Prefer not to say</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label for="grade">Grade Level</label>
+                <select id="grade" name="grade" aria-label="Grade level">
+                    <option value="">Select grade</option>
+                    <option value="1">1st Grade</option>
+                    <option value="2">2nd Grade</option>
+                    <option value="3">3rd Grade</option>
+                    <option value="4">4th Grade</option>
+                    <option value="5">5th Grade</option>
+                    <option value="6">6th Grade</option>
+                    <option value="7">7th Grade</option>
+                    <option value="8">8th Grade</option>
+                    <option value="9">9th Grade</option>
+                    <option value="10">10th Grade</option>
+                    <option value="11">11th Grade</option>
+                    <option value="12">12th Grade</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label for="notes">Notes (Optional)</label>
+                <textarea id="notes" name="notes" rows="3" aria-label="Additional notes" placeholder="Any additional information about your child..."></textarea>
+            </div>
+
+            <div style="display: flex; gap: 1rem;">
+                <button type="submit" class="btn btn-primary" style="flex: 1; color: white;">Add Child</button>
+                <a href="/children/" class="btn btn-outline" style="flex: 1; text-align: center;">Cancel</a>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.getElementById('addChildForm').addEventListener('submit', async function(e) {
+        e.preventDefault();
+
+        const token = localStorage.getItem('access_token');
+        const formData = new FormData(this);
+        const data = {
+            first_name: formData.get('first_name'),
+            last_name: formData.get('last_name'),
+            dob: formData.get('dob'),
+            gender: formData.get('gender'),
+            grade: formData.get('grade'),
+            notes: formData.get('notes'),
+        };
+
+        try {
+            const response = await fetch('/api/children/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`,
+                    'X-CSRFToken': formData.get('csrfmiddlewaretoken'),
+                },
+                body: JSON.stringify(data)
+            });
+
+            if (response.ok) {
+                alert('Child profile created successfully!');
+                window.location.href = '/children/';
+            } else if (response.status === 401) {
+                window.location.href = '/login/';
+            } else {
+                const error = await response.json();
+                alert('Error creating profile: ' + (error.detail || 'Please check your information'));
+            }
+        } catch (err) {
+            console.error('Error:', err);
+            alert('An error occurred. Please try again.');
+        }
+    });
+</script>
+{% endblock %}

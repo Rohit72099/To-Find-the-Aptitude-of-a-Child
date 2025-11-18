@@ -1,0 +1,126 @@
+{% extends "base.html" %}
+
+{% block title %}Edit Child - KidAptitude{% endblock %}
+
+{% block content %}
+<div class="container" style="max-width: 500px; margin: 2rem auto;">
+    <h1 style="color: var(--primary); margin-bottom: 1.5rem;">Edit Child Profile</h1>
+
+    <div class="card">
+        <form id="editChildForm">
+            {% csrf_token %}
+
+            <div class="form-group">
+                <label for="firstName">First Name *</label>
+                <input type="text" id="firstName" name="first_name" required aria-label="First name">
+            </div>
+
+            <div class="form-group">
+                <label for="lastName">Last Name</label>
+                <input type="text" id="lastName" name="last_name" aria-label="Last name">
+            </div>
+
+            <div class="form-group">
+                <label for="dob">Date of Birth *</label>
+                <input type="date" id="dob" name="dob" required aria-label="Date of birth">
+            </div>
+
+            <div class="form-group">
+                <label for="gender">Gender</label>
+                <select id="gender" name="gender" aria-label="Gender">
+                    <option value="">Select gender</option>
+                    <option value="male">Male</option>
+                    <option value="female">Female</option>
+                    <option value="other">Other</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label for="grade">Grade Level</label>
+                <select id="grade" name="grade" aria-label="Grade level">
+                    <option value="">Select grade</option>
+                    <option value="1">1st Grade</option>
+                    <option value="2">2nd Grade</option>
+                    <option value="3">3rd Grade</option>
+                    <option value="4">4th Grade</option>
+                    <option value="5">5th Grade</option>
+                    <option value="6">6th Grade</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label for="notes">Notes (Optional)</label>
+                <textarea id="notes" name="notes" rows="3" aria-label="Additional notes"></textarea>
+            </div>
+
+            <div style="display: flex; gap: 1rem;">
+                <button type="submit" class="btn btn-primary" style="flex: 1; color: white;">Update Child</button>
+                <a href="/children/" class="btn btn-outline" style="flex: 1; text-align: center;">Cancel</a>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+    // Load and populate child data
+    async function loadChildData() {
+        const childId = "{{ child_id }}";
+        const token = localStorage.getItem('access_token');
+        
+        try {
+            const response = await fetch(`/api/children/${childId}/`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+
+            if (response.ok) {
+                const child = await response.json();
+                document.getElementById('firstName').value = child.first_name;
+                document.getElementById('lastName').value = child.last_name;
+                document.getElementById('dob').value = child.dob;
+                document.getElementById('gender').value = child.gender;
+                document.getElementById('grade').value = child.grade;
+                document.getElementById('notes').value = child.notes;
+            }
+        } catch (err) {
+            console.error('Error:', err);
+        }
+    }
+
+    loadChildData();
+
+    document.getElementById('editChildForm').addEventListener('submit', async function(e) {
+        e.preventDefault();
+
+        const childId = "{{ child_id }}";
+        const token = localStorage.getItem('access_token');
+        const formData = new FormData(this);
+        const data = {
+            first_name: formData.get('first_name'),
+            last_name: formData.get('last_name'),
+            dob: formData.get('dob'),
+            gender: formData.get('gender'),
+            grade: formData.get('grade'),
+            notes: formData.get('notes'),
+        };
+
+        try {
+            const response = await fetch(`/api/children/${childId}/`, {
+                method: 'PATCH',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`,
+                },
+                body: JSON.stringify(data)
+            });
+
+            if (response.ok) {
+                alert('Child profile updated successfully!');
+                window.location.href = '/children/';
+            }
+        } catch (err) {
+            console.error('Error:', err);
+            alert('An error occurred. Please try again.');
+        }
+    });
+</script>
+{% endblock %}

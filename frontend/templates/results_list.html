@@ -1,0 +1,141 @@
+{% extends "base.html" %}
+
+{% block title %}My Results - KidAptitude{% endblock %}
+
+{% block content %}
+<div class="container">
+    <h1 style="color: var(--primary); margin: 2rem 0;">My Assessment Results</h1>
+
+    <div style="background: var(--light); padding: 1.5rem; border-radius: 0.5rem; margin-bottom: 2rem;">
+        <label for="childSelector" style="display: block; margin-bottom: 0.5rem; font-weight: 600;">Filter by Child:</label>
+        <select id="childSelector" style="padding: 0.75rem; border: 1px solid var(--border); border-radius: 0.5rem; width: 100%; max-width: 300px;">
+            <option value="">-- All Children --</option>
+        </select>
+    </div>
+
+    <div id="resultsList" style="margin-bottom: 2rem;">
+        <p style="text-align: center;">Loading results...</p>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    let allResults = [];
+    let selectedChildId = null;
+
+    async function loadChildren() {
+        try {
+            const response = await fetch('/api/children/', {
+                credentials: 'include'
+            });
+            if (response.ok) {
+                const children = await response.json();
+                const selector = document.getElementById('childSelector');
+                children.forEach(child => {
+                    const option = document.createElement('option');
+                    option.value = child.id;
+                    option.textContent = child.first_name + ' ' + (child.last_name || '');
+                    selector.appendChild(option);
+                });
+            }
+        } catch (err) {
+            console.error('Error loading children:', err);
+        }
+    }
+
+
+    async function loadResults() {
+        try {
+            console.log('Fetching results from /api/results/');
+            const response = await fetch('/api/results/', {
+                credentials: 'include'
+            });
+            
+            if (!response.ok) {
+                const errorText = await response.text();
+                throw new Error(`HTTP ${response.status}: ${errorText}`);
+            }
+            
+            allResults = await response.json();
+            console.log('Results loaded:', allResults);
+            displayResults(allResults);
+        } catch (err) {
+            console.error('Error loading results:', err);
+            document.getElementById('resultsList').innerHTML = `
+                <div class="card" style="text-align: center; padding: 2rem;">
+                    <p style="color: var(--danger); font-size: 1.1rem;">
+                        Failed to load results: ${err.message}
+                    </p>
+                </div>
+            `;
+        }
+    }
+        
+    function displayResults(results) {
+        const container = document.getElementById('resultsList');
+        
+        let filtered = results;
+        if (selectedChildId) {
+            filtered = results.filter(r => r.child_id === parseInt(selectedChildId));
+        }
+        if (!filtered || filtered.length === 0) {
+            container.innerHTML = `
+                <div class="card" style="text-align: center; padding: 2rem;">
+                    <p style="font-size: 1.1rem; color: var(--text); margin-bottom: 1rem;">
+                        No assessment results yet. 
+                    </p>
+                    <a href="/assessments/" class="btn btn-primary" style="color: white; text-decoration: none; padding: 0.75rem 2rem; display: inline-block;">
+                        Take an Assessment
+                    </a>
+                </div>
+            `;
+            return;
+        }
+
+        const html = filtered.map(result => {
+            const percentage = result.normalized_scores?.percent || 0;
+            let perfColor = '#ef4444';
+            if (percentage >= 80) perfColor = '#10b981';
+            else if (percentage >= 60) perfColor = '#3b82f6';
+            else if (percentage >= 40) perfColor = '#f59e0b';
+            
+            return `
+                <div class="card" style="margin-bottom: 1rem; padding: 1.5rem;">
+                    <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 1rem;">
+                        <div>
+                            <h3 style="color: var(--primary); margin: 0 0 0.5rem 0;">
+                                ${result.assessment_title || 'Assessment'}
+                            </h3>
+                            <p style="margin: 0; color: var(--text); font-size: 0.9rem;">
+                                ${new Date(result.completed_at).toLocaleDateString()} at ${new Date(result.completed_at).toLocaleTimeString()}
+                            </p>
+                        </div>
+                        <div style="text-align: right;">
+                            <div style="font-size: 2rem; font-weight: bold; color: ${perfColor};">
+                                ${Math.round(percentage)}%
+                            </div>
+                            <div style="font-size: 0.9rem; color: var(--text);">
+                                ${result.raw_scores?.score}/${result.raw_scores?.total}
+                            </div>
+                        </div>
+                    </div>
+                    <a href="/results/${result.id}/" class="btn btn-primary" style="color: white; text-decoration: none; padding: 0.5rem 1rem; display: inline-block;">
+                        View Details →
+                    </a>
+                </div>
+            `;
+        }).join('');
+
+        container.innerHTML = html;
+    }
+
+    document.getElementById('childSelector').addEventListener('change', (e) => {
+        selectedChildId = e.target.value || null;
+        displayResults(allResults);
+    });
+
+    loadChildren();
+    loadResults();
+</script>
+{% endblock %}

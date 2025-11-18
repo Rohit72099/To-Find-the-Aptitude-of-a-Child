@@ -1,0 +1,212 @@
+{% extends "base.html" %}
+
+{% block title %}Results - KidAptitude{% endblock %}
+
+{% block content %}
+<style>
+    .results-container {
+        max-width: 900px;
+        margin: 2rem auto;
+    }
+
+    .score-card {
+        background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+        color: white;
+        padding: 2rem;
+        border-radius: 1rem;
+        margin-bottom: 2rem;
+        text-align: center;
+    }
+
+    .score-display {
+        font-size: 3rem;
+        font-weight: 700;
+        margin-bottom: 0.5rem;
+    }
+
+    .score-label {
+        font-size: 1.1rem;
+        opacity: 0.95;
+    }
+
+    .chart-container {
+        background: white;
+        padding: 2rem;
+        border-radius: 1rem;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+        margin-bottom: 2rem;
+    }
+
+    .recommendations {
+        background: #dbeafe;
+        border-left: 4px solid var(--primary);
+        padding: 1.5rem;
+        border-radius: 0.5rem;
+        margin-bottom: 2rem;
+    }
+
+    .recommendations h3 {
+        color: var(--primary);
+        margin-bottom: 1rem;
+    }
+
+    .recommendation-item {
+        margin-bottom: 1rem;
+        padding-bottom: 1rem;
+        border-bottom: 1px solid rgba(99, 102, 241, 0.2);
+    }
+
+    .recommendation-item:last-child {
+        border-bottom: none;
+        margin-bottom: 0;
+        padding-bottom: 0;
+    }
+
+    .action-buttons {
+        display: flex;
+        gap: 1rem;
+        margin-bottom: 2rem;
+        flex-wrap: wrap;
+    }
+
+    .action-buttons .btn {
+        flex: 1;
+        min-width: 200px;
+    }
+</style>
+
+<div class="results-container">
+    <h1 style="color: var(--primary); margin-bottom: 2rem;">Assessment Results</h1>
+
+    <div class="score-card">
+        <div class="score-label">Your Score</div>
+        <div class="score-display" id="score">--</div>
+        <div class="score-label" id="percentage">--</div>
+    </div>
+
+    <div class="chart-container">
+        <h2 style="margin-bottom: 1.5rem;">Performance Breakdown</h2>
+        <canvas id="performanceChart" height="80"></canvas>
+    </div>
+
+    <div id="recommendations" class="recommendations" style="display: none;">
+        <h3>📚 Personalized Recommendations</h3>
+        <div id="recommendationsList"></div>
+    </div>
+
+    <div class="action-buttons">
+        <button id="downloadPdfBtn" class="btn btn-primary" style="color: white;">📥 Download PDF Report</button>
+        <a href="/dashboard/" class="btn btn-outline">Return to Dashboard</a>
+    </div>
+
+    <div class="card">
+        <h3>Next Steps</h3>
+        <ul style="margin-left: 1.5rem;">
+            <li>Share this report with educators and mentors</li>
+            <li>Explore recommended learning resources</li>
+            <li>Take additional assessments to explore other areas</li>
+            <li>Track progress by retaking assessments periodically</li>
+        </ul>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/html2pdf@0.10.1/dist/html2pdf.bundle.min.js"></script>
+<script>
+    async function loadResults() {
+        const sessionId = new URLSearchParams(window.location.search).get('session_id') || 
+                         window.location.pathname.split('/').pop();
+        const token = localStorage.getItem('access_token');
+
+        try {
+            const response = await fetch(`/api/sessions/${sessionId}/results/`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+
+            if (response.ok) {
+                const results = await response.json();
+                displayResults(results);
+            }
+        } catch (err) {
+            console.error('Error:', err);
+            document.querySelector('.results-container').innerHTML = 
+                '<p style="color: var(--danger); text-align: center;">Failed to load results.</p>';
+        }
+    }
+
+    function displayResults(results) {
+        const rawScores = results.raw_scores || {};
+        const normalizedScores = results.normalized_scores || {};
+        const score = rawScores.score || 0;
+        const total = rawScores.total || 1;
+        const percentage = normalizedScores.percent || 0;
+
+        document.getElementById('score').textContent = `${score}/${total}`;
+        document.getElementById('percentage').textContent = `${percentage.toFixed(1)}%`;
+
+        // Display recommendations
+        if (results.recommendations) {
+            const recList = document.getElementById('recommendationsList');
+            const recs = Array.isArray(results.recommendations) ? results.recommendations : 
+                        (results.recommendations.suggestions || []);
+            
+            if (recs.length > 0) {
+                document.getElementById('recommendations').style.display = 'block';
+                recList.innerHTML = recs.map(rec => `
+                    <div class="recommendation-item">
+                        <strong>${rec.title || rec}</strong>
+                        <p>${rec.description || ''}</p>
+                    </div>
+                `).join('');
+            }
+        }
+
+        // Draw chart
+        drawChart(score, total - score);
+
+        // PDF download
+        document.getElementById('downloadPdfBtn').addEventListener('click', () => generatePDF(results));
+    }
+
+    function drawChart(correct, incorrect) {
+        const ctx = document.getElementById('performanceChart').getContext('2d');
+        new Chart(ctx, {
+            type: 'doughnut',
+            data: {
+                labels: ['Correct', 'Incorrect'],
+                datasets: [{
+                    data: [correct, incorrect],
+                    backgroundColor: ['var(--success)', '#e5e7eb'],
+                    borderColor: ['white', 'white'],
+                    borderWidth: 2
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: true,
+                plugins: {
+                    legend: {
+                        position: 'bottom'
+                    }
+                }
+            }
+        });
+    }
+
+    function generatePDF(results) {
+        const element = document.querySelector('.results-container');
+        const opt = {
+            margin: 10,
+            filename: 'assessment-results.pdf',
+            image: { type: 'jpeg', quality: 0.98 },
+            html2canvas: { scale: 2 },
+            jsPDF: { orientation: 'portrait', unit: 'mm', format: 'a4' }
+        };
+        html2pdf().set(opt).from(element).save();
+    }
+
+    loadResults();
+</script>
+{% endblock %}

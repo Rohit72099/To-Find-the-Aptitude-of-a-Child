@@ -1,0 +1,92 @@
+{% extends "base.html" %}
+
+{% block title %}Add Question - Admin{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="card" style="margin-top: 2rem;">
+        <h2 style="color: var(--primary); margin-bottom: 0.5rem;">Add Question to: {{ assessment.title }}</h2>
+
+        <div style="margin-bottom: 1rem;">
+            <strong>Existing Sections</strong>
+            <div class="grid grid-2" style="margin-top:0.5rem;">
+                {% for s in sections %}
+                    <div class="card" style="padding:0.75rem;">
+                        <div style="font-weight:600;">{{ s.title }}</div>
+                        <div style="font-size:0.9rem; color:var(--text);">ID: {{ s.id }}</div>
+                    </div>
+                {% empty %}
+                    <div class="card">No sections yet</div>
+                {% endfor %}
+            </div>
+        </div>
+
+        <form method="post">
+            {% csrf_token %}
+            <div class="form-group">
+                <label for="section_select">Choose Section (or leave empty to create new)</label>
+                <select id="section_select" name="section_select" class="form-control" style="padding:0.6rem; margin-top:0.5rem;">
+                    <option value="">-- choose section --</option>
+                    {% for s in sections %}
+                        <option value="{{ s.id }}">{{ s.title }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label for="new_section_title">Or create new section</label>
+                <input type="text" name="new_section_title" id="new_section_title" placeholder="New section title" />
+            </div>
+
+            <div class="form-group">
+                {{ form.text.label_tag }}
+                {{ form.text }}
+            </div>
+
+            <div class="grid grid-2">
+                <div class="form-group">
+                    {{ form.type.label_tag }}
+                    {{ form.type }}
+                </div>
+                <div class="form-group">
+                    {{ form.order.label_tag }}
+                    {{ form.order }}
+                </div>
+            </div>
+
+            <div class="form-group">
+                {{ form.options_input.label_tag }}
+                {{ form.options_input }}
+                <small style="display:block; margin-top:0.4rem; color:var(--text);">Enter JSON like {"options":["A","B"], "correct":1} or comma-separated values.</small>
+            </div>
+
+            <div style="margin-top:1rem;">
+                <button type="submit" class="btn btn-primary">Add Question</button>
+                <a href="/admin/" class="btn btn-outline" style="margin-left:0.5rem;">Back to Admin</a>
+            </div>
+        </form>
+        
+        {% if questions and questions|length > 0 %}
+        <div style="margin-top:1.5rem;">
+            <h3 style="margin-bottom:0.75rem;">Existing Questions</h3>
+            <div class="grid">
+                {% for q in questions %}
+                <div class="card" style="display:flex; justify-content:space-between; align-items:start;">
+                    <div style="max-width:80%;">
+                        <div style="font-weight:600; margin-bottom:0.5rem;">{{ q.text|truncatechars:120 }}</div>
+                        <div style="font-size:0.9rem; color:var(--text);">Section: {{ q.section.title if q.section }} • Type: {{ q.type }}</div>
+                    </div>
+                    <div style="text-align:right;">
+                        <form method="post" action="{% url 'assessments-admin-delete-question' question_id=q.id %}" onsubmit="return confirm('Delete this question?');">
+                            {% csrf_token %}
+                            <button type="submit" class="btn" style="background: var(--danger); color: white; padding:0.5rem 0.75rem; border-radius:0.5rem;">Delete</button>
+                        </form>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

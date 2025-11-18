@@ -1,0 +1,376 @@
+{% extends "base.html" %}
+
+{% block title %}Take Assessment - KidAptitude{% endblock %}
+
+{% block content %}
+{% csrf_token %}
+<style>
+    .test-container {
+        background: white;
+        border-radius: 1rem;
+        padding: 2rem;
+        margin: 2rem 0;
+        max-width: 800px;
+        margin-left: auto;
+        margin-right: auto;
+    }
+
+    .progress-bar {
+        width: 100%;
+        height: 8px;
+        background: var(--border);
+        border-radius: 4px;
+        margin-bottom: 2rem;
+        overflow: hidden;
+    }
+
+    .progress-fill {
+        height: 100%;
+        background: linear-gradient(90deg, var(--primary), var(--secondary));
+        transition: width 0.3s;
+    }
+
+    .question-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 1.5rem;
+        padding-bottom: 1rem;
+        border-bottom: 1px solid var(--border);
+    }
+
+    .timer {
+        font-weight: 700;
+        font-size: 1.25rem;
+        padding: 0.5rem 1rem;
+        background: var(--light);
+        border-radius: 0.5rem;
+        color: var(--primary);
+    }
+
+    .question-text {
+        font-size: 1.25rem;
+        font-weight: 600;
+        margin-bottom: 1.5rem;
+        color: var(--dark);
+    }
+
+    .options {
+        display: flex;
+        flex-direction: column;
+        gap: 1rem;
+        margin-bottom: 2rem;
+    }
+
+    .option {
+        display: flex;
+        align-items: center;
+        padding: 1rem;
+        border: 2px solid var(--border);
+        border-radius: 0.5rem;
+        cursor: pointer;
+        transition: all 0.3s;
+    }
+
+    .option:hover {
+        border-color: var(--primary);
+        background: var(--light);
+    }
+
+    .option input[type="radio"] {
+        margin-right: 1rem;
+        width: 20px;
+        height: 20px;
+        cursor: pointer;
+    }
+
+    .option.selected {
+        border-color: var(--primary);
+        background: #eef2ff;
+    }
+
+    .navigation {
+        display: flex;
+        gap: 1rem;
+        justify-content: space-between;
+        margin-top: 2rem;
+    }
+
+    .navigation .btn {
+        flex: 1;
+    }
+</style>
+
+<div class="container">
+    <div class="test-container">
+        <div class="question-header">
+            <div>
+                <h2 id="assessmentTitle">Loading...</h2>
+                <p style="color: var(--text);">Question <span id="currentQuestion">1</span> of <span id="totalQuestions">0</span></p>
+            </div>
+            <div class="timer" id="timer">Time: <span id="timerText">00:00</span></div>
+        </div>
+
+        <div class="progress-bar">
+            <div class="progress-fill" id="progressFill" style="width: 0%;"></div>
+        </div>
+
+        <div id="questionContainer">
+            <p style="text-align: center; color: var(--text);">Loading questions...</p>
+        </div>
+
+        <div class="navigation">
+            <button id="prevBtn" class="btn btn-outline" disabled>← Previous</button>
+            <button id="submitBtn" class="btn btn-success" style="display: none; background: var(--success); color: white;">Submit Assessment</button>
+            <button id="nextBtn" class="btn btn-primary" style="color: white;">Next →</button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    let assessment = null;
+    let currentQuestionIndex = 0;
+    let userAnswers = {};
+    let startTime = null;
+    let timerInterval = null;
+
+    async function loadAssessment() {
+        const assessmentId = new URLSearchParams(window.location.search).get('assessment_id');
+        const childId = new URLSearchParams(window.location.search).get('child_id');
+
+        console.log('Loading assessment:', { assessmentId, childId });
+
+        if (!assessmentId || !childId) {
+            document.getElementById('questionContainer').innerHTML = '<p style="color: var(--danger);">Missing assessment or child ID.</p>';
+            return;
+        }
+
+        try {
+            const response = await fetch(`/api/assessments/${assessmentId}/`);
+            console.log('Fetch response status:', response.status);
+            
+            if (response.ok) {
+                assessment = await response.json();
+                console.log('Assessment loaded:', assessment);
+                initializeTest();
+            } else {
+                console.error('Failed to fetch assessment. Status:', response.status);
+                const errorText = await response.text();
+                console.error('Error response:', errorText);
+                document.getElementById('questionContainer').innerHTML = `<p style="color: var(--danger);">Failed to load assessment. Status: ${response.status}</p>`;
+            }
+        } catch (err) {
+            console.error('Error loading assessment:', err);
+            document.getElementById('questionContainer').innerHTML = '<p style="color: var(--danger);">Error: ' + err.message + '</p>';
+        }
+    }
+
+    function initializeTest() {
+        if (!assessment || !assessment.sections) {
+            console.error('Assessment or sections missing:', assessment);
+            document.getElementById('questionContainer').innerHTML = '<p style="color: var(--danger);">Invalid assessment data.</p>';
+            return;
+        }
+        
+        document.getElementById('assessmentTitle').textContent = assessment.title;
+        
+        const allQuestions = assessment.sections.flatMap(s => s.questions) || [];
+        document.getElementById('totalQuestions').textContent = allQuestions.length;
+
+        if (allQuestions.length === 0) {
+            document.getElementById('questionContainer').innerHTML = '<p style="color: var(--danger);">No questions available.</p>';
+            return;
+        }
+
+        startTime = Date.now();
+        startTimer();
+        displayQuestion();
+    }
+
+    function startTimer() {
+        // Update immediately
+        const updateTimer = () => {
+            const elapsed = Math.floor((Date.now() - startTime) / 1000);
+            const minutes = Math.floor(elapsed / 60);
+            const seconds = elapsed % 60;
+            const displayText = `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+            document.getElementById('timerText').textContent = displayText;
+        };
+        
+        updateTimer(); // Call once immediately
+        timerInterval = setInterval(updateTimer, 1000);
+    }
+
+    function displayQuestion() {
+        const allQuestions = assessment.sections?.flatMap(s => s.questions) || [];
+        const question = allQuestions[currentQuestionIndex];
+
+        if (!question) return;
+
+        document.getElementById('currentQuestion').textContent = currentQuestionIndex + 1;
+        const progress = ((currentQuestionIndex + 1) / allQuestions.length) * 100;
+        document.getElementById('progressFill').style.width = progress + '%';
+
+        let optionsHtml = '';
+        if (question.type === 'mcq' && question.options) {
+            const options = Array.isArray(question.options) ? question.options : 
+                           (question.options.options || []);
+            
+            optionsHtml = options.map((opt, idx) => `
+                <label class="option">
+                    <input type="radio" name="answer" value="${idx}" 
+                           ${userAnswers[question.id] == idx ? 'checked' : ''}
+                           onchange="handleAnswer(${question.id}, ${idx})">
+                    <span>${opt}</span>
+                </label>
+            `).join('');
+        }
+
+        document.getElementById('questionContainer').innerHTML = `
+            <div class="question-text">${question.text}</div>
+            ${question.media_url ? `<img src="${question.media_url}" style="max-width: 100%; margin-bottom: 1rem; border-radius: 0.5rem;">` : ''}
+            <div class="options">${optionsHtml}</div>
+        `;
+
+        // Update navigation buttons
+        document.getElementById('prevBtn').disabled = currentQuestionIndex === 0;
+        document.getElementById('nextBtn').style.display = currentQuestionIndex < allQuestions.length - 1 ? 'block' : 'none';
+        document.getElementById('submitBtn').style.display = currentQuestionIndex === allQuestions.length - 1 ? 'block' : 'none';
+
+        updateOptionClasses();
+    }
+
+    function handleAnswer(questionId, answer) {
+        userAnswers[questionId] = answer;
+        updateOptionClasses();
+    }
+
+    function updateOptionClasses() {
+        document.querySelectorAll('.option input[type="radio"]:checked').forEach(el => {
+            el.closest('.option').classList.add('selected');
+        });
+        document.querySelectorAll('.option input[type="radio"]:not(:checked)').forEach(el => {
+            el.closest('.option').classList.remove('selected');
+        });
+    }
+
+    // Navigation button handlers
+    document.getElementById('nextBtn').addEventListener('click', () => {
+        if (!assessment) return;
+        const allQuestions = assessment.sections?.flatMap(s => s.questions) || [];
+        if (currentQuestionIndex < allQuestions.length - 1) {
+            currentQuestionIndex++;
+            displayQuestion();
+        }
+    });
+
+    document.getElementById('prevBtn').addEventListener('click', () => {
+        if (!assessment) return;
+        if (currentQuestionIndex > 0) {
+            currentQuestionIndex--;
+            displayQuestion();
+        }
+    });
+
+    // Get CSRF token from cookie
+    function getCookie(name) {
+        let cookieValue = null;
+        if (document.cookie && document.cookie !== '') {
+            const cookies = document.cookie.split(';');
+            for (let i = 0; i < cookies.length; i++) {
+                const cookie = cookies[i].trim();
+                if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                    break;
+                }
+            }
+        }
+        return cookieValue;
+    }
+
+    document.getElementById('submitBtn').addEventListener('click', async () => {
+        if (!assessment) return;
+        clearInterval(timerInterval);
+        
+        const assessmentId = new URLSearchParams(window.location.search).get('assessment_id');
+        const childId = new URLSearchParams(window.location.search).get('child_id');
+        const csrfToken = getCookie('csrftoken') || document.querySelector('[name=csrfmiddlewaretoken]')?.value || '';
+        
+        try {
+            // Start assessment session
+            const startRes = await fetch(`/api/assessments/${assessmentId}/start/`, {
+                method: 'POST',
+                credentials: 'include',
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': csrfToken
+                },
+                body: JSON.stringify({ child_id: childId })
+            });
+            
+            console.log('Start response status:', startRes.status);
+            if (!startRes.ok) {
+                const errorText = await startRes.text();
+                console.error('Start error:', startRes.status, errorText);
+                throw new Error(`Failed to start assessment: ${startRes.status}`);
+            }
+            const sessionData = await startRes.json();
+            const sessionId = sessionData.session_id;
+            console.log('Session created:', sessionId);
+            
+            // Convert userAnswers to API format
+            const allQuestions = assessment.sections.flatMap(s => s.questions);
+            const answers = allQuestions.map(q => ({
+                question: q.id,
+                answer: userAnswers[q.id] !== undefined ? userAnswers[q.id] : null
+            }));
+            
+            console.log('Submitting answers:', answers);
+            
+            // Submit answers
+            const answerRes = await fetch(`/api/sessions/${sessionId}/answer/`, {
+                method: 'POST',
+                credentials: 'include',
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': csrfToken
+                },
+                body: JSON.stringify({ answers: answers })
+            });
+            
+            console.log('Answer response status:', answerRes.status);
+            if (!answerRes.ok) throw new Error('Failed to submit answers');
+            const answerData = await answerRes.json();
+            console.log('Answers saved:', answerData);
+            
+            // Complete assessment (triggers scoring)
+            const completeRes = await fetch(`/api/sessions/${sessionId}/complete/`, {
+                method: 'POST',
+                credentials: 'include',
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': csrfToken
+                },
+                body: JSON.stringify({})
+            });
+            
+            console.log('Complete response status:', completeRes.status);
+            if (!completeRes.ok) throw new Error('Failed to complete assessment');
+            const completeData = await completeRes.json();
+            console.log('Assessment completed:', completeData);
+            
+            // Redirect to results
+            window.location.href = `/results/${sessionId}/`;
+            
+        } catch (err) {
+            console.error('Error submitting assessment:', err);
+            alert('Error submitting assessment: ' + err.message);
+        }
+    });
+
+    // Load assessment on page load
+    window.addEventListener('DOMContentLoaded', loadAssessment);
+</script>
+{% endblock %}

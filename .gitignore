@@ -1,0 +1,103 @@
+# Python bytecode
+__pycache__/
+*.py[cod]
+*$py.class
+
+# C extensions
+*.so
+
+# Distribution / packaging
+.Python
+build/
+dist/
+eggs/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual environments
+env/
+venv/
+ENV/
+.venv/
+venv.bak/
+
+# Installer logs
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Unit test / coverage
+htmlcov/
+.tox/
+.nox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*,cover
+.pytest_cache/
+
+# Django stuff
+*.log
+local_settings.py
+db.sqlite3
+db.sqlite3-journal
+
+# Media and static (for local dev) - track only if you deliberately want these in repo
+/media/
+/staticfiles/
+
+# Uploaded files
+media/
+uploads/
+
+# Secrets / env files
+.env
+.env.*
+.env.local
+.env.*.local
+secrets.json
+
+# Editors
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+
+# JetBrains
+*.iml
+.idea/
+
+# Mac / Windows
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Node / JS
+node_modules/
+npm-debug.log
+yarn-debug.log
+yarn-error.log
+
+# Misc caches and tooling
+.mypy_cache/
+.pyre/
+.pytype/
+.ropeproject/
+
+# PyInstaller
+*.manifest
+*.spec
+
+# celery beat schedule
+celerybeat-schedule
+
+# dotenv
+*.env
+
+# Optional: ignore migrations if you prefer not to track them (usually you should track migrations)
+# **/migrations/*.pyc
+# **/migrations/__pycache__/
+
+# End of file

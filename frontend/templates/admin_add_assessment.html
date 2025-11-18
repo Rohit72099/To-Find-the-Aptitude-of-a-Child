@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+
+{% block title %}Add Assessment - Admin{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="card" style="margin-top: 2rem;">
+        <h2 style="color: var(--primary); margin-bottom: 1rem;">Create Assessment</h2>
+        <form method="post">
+            {% csrf_token %}
+            <div class="grid grid-2">
+                <div>
+                    <div class="form-group">
+                        {{ form.title.label_tag }}
+                        {{ form.title }}
+                        {% if form.title.errors %}<div class="form-error">{{ form.title.errors }}</div>{% endif %}
+                    </div>
+                    <div class="form-group">
+                        {{ form.description.label_tag }}
+                        {{ form.description }}
+                        {% if form.description.errors %}<div class="form-error">{{ form.description.errors }}</div>{% endif %}
+                    </div>
+                </div>
+
+                <div>
+                    <div class="form-group">
+                        {{ form.age_min.label_tag }}
+                        {{ form.age_min }}
+                    </div>
+                    <div class="form-group">
+                        {{ form.age_max.label_tag }}
+                        {{ form.age_max }}
+                    </div>
+                    <div class="form-group">
+                        {{ form.language.label_tag }}
+                        {{ form.language }}
+                    </div>
+                    <div class="form-group">
+                        {{ form.time_limit.label_tag }}
+                        {{ form.time_limit }}
+                    </div>
+                    <div class="form-group">
+                        {{ form.adaptive.label_tag }}
+                        {{ form.adaptive }}
+                    </div>
+                    <div class="form-group">
+                        {{ form.published.label_tag }}
+                        {{ form.published }}
+                    </div>
+                    <div class="form-group">
+                        {{ form.version.label_tag }}
+                        {{ form.version }}
+                    </div>
+                </div>
+            </div>
+
+            <div style="margin-top: 1rem;">
+                <button type="submit" class="btn btn-primary">Create Assessment</button>
+                <a href="/admin/" class="btn btn-outline" style="margin-left:0.5rem;">Back to Admin</a>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

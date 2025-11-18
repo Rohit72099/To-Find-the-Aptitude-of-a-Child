@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+
+{% block title %}Home - KidAptitude{% endblock %}
+
+{% block content %}
+<div class="hero">
+    <h1>Discover Your Child's Potential</h1>
+    <p>Comprehensive aptitude assessment designed for children to unlock their strengths and interests.</p>
+    {% if not user.is_authenticated %}
+        <a href="/register/" class="btn btn-primary" style="color: white; margin-right: 1rem;">Get Started</a>
+        <a href="/login/" class="btn btn-outline">Sign In</a>
+    {% else %}
+        <a href="/dashboard/" class="btn btn-primary" style="color: white;">Go to Dashboard</a>
+    {% endif %}
+</div>
+
+<div class="container">
+    <div class="grid grid-3" style="margin: 3rem 0;">
+        <div class="card">
+            <h3>📊 Accurate Assessment</h3>
+            <p>Research-backed tests designed by educational experts to measure aptitude and interests across multiple domains.</p>
+        </div>
+        <div class="card">
+            <h3>👨‍👩‍👧 Parent Insights</h3>
+            <p>Detailed reports and personalized recommendations to help parents understand and support their child's development.</p>
+        </div>
+        <div class="card">
+            <h3>🎯 Actionable Guidance</h3>
+            <p>Discover suggested activities, learning resources, and career pathways aligned with your child's strengths.</p>
+        </div>
+    </div>
+
+    {% if not user.is_authenticated %}
+    <section style="text-align: center; padding: 3rem 0;">
+        <h2 style="margin-bottom: 1rem;">Ready to get started?</h2>
+        <p style="margin-bottom: 2rem; font-size: 1.1rem;">Create an account and add your first child in minutes.</p>
+        <a href="/register/" class="btn btn-primary" style="color: white; font-size: 1.1rem; padding: 1rem 2rem;">Create Free Account</a>
+    </section>
+    {% endif %}
+</div>
+{% endblock %}

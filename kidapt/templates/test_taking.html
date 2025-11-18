@@ -1,0 +1,315 @@
+{% extends "base.html" %}
+
+{% block title %}Take Assessment - KidAptitude{% endblock %}
+
+{% block content %}
+<style>
+    .test-container {
+        background: white;
+        border-radius: 1rem;
+        padding: 2rem;
+        margin: 2rem 0;
+        max-width: 800px;
+        margin-left: auto;
+        margin-right: auto;
+    }
+
+    .progress-bar {
+        width: 100%;
+        height: 8px;
+        background: var(--border);
+        border-radius: 4px;
+        margin-bottom: 2rem;
+        overflow: hidden;
+    }
+
+    .progress-fill {
+        height: 100%;
+        background: linear-gradient(90deg, var(--primary), var(--secondary));
+        transition: width 0.3s;
+    }
+
+    .question-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 1.5rem;
+        padding-bottom: 1rem;
+        border-bottom: 1px solid var(--border);
+    }
+
+    .timer {
+        font-weight: 700;
+        font-size: 1.25rem;
+        padding: 0.5rem 1rem;
+        background: var(--light);
+        border-radius: 0.5rem;
+        color: var(--primary);
+    }
+
+    .timer.warning {
+        background: #fef3c7;
+        color: var(--warning);
+    }
+
+    .timer.danger {
+        background: #fee2e2;
+        color: var(--danger);
+    }
+
+    .question-text {
+        font-size: 1.25rem;
+        font-weight: 600;
+        margin-bottom: 1.5rem;
+        color: var(--dark);
+    }
+
+    .options {
+        display: flex;
+        flex-direction: column;
+        gap: 1rem;
+        margin-bottom: 2rem;
+    }
+
+    .option {
+        display: flex;
+        align-items: center;
+        padding: 1rem;
+        border: 2px solid var(--border);
+        border-radius: 0.5rem;
+        cursor: pointer;
+        transition: all 0.3s;
+    }
+
+    .option:hover {
+        border-color: var(--primary);
+        background: var(--light);
+    }
+
+    .option input[type="radio"],
+    .option input[type="checkbox"] {
+        margin-right: 1rem;
+        width: 20px;
+        height: 20px;
+        cursor: pointer;
+    }
+
+    .option.selected {
+        border-color: var(--primary);
+        background: #eef2ff;
+    }
+
+    .navigation {
+        display: flex;
+        gap: 1rem;
+        justify-content: space-between;
+        margin-top: 2rem;
+    }
+
+    .navigation .btn {
+        flex: 1;
+    }
+</style>
+
+<div class="container">
+    <div class="test-container">
+        <div class="question-header">
+            <div>
+                <h2 id="assessmentTitle">Loading...</h2>
+                <p style="color: var(--text);">Question <span id="currentQuestion">1</span> of <span id="totalQuestions">0</span></p>
+            </div>
+            <div class="timer" id="timer">Time: <span id="timerText">00:00</span></div>
+        </div>
+
+        <div class="progress-bar">
+            <div class="progress-fill" id="progressFill" style="width: 0%;"></div>
+        </div>
+
+        <div id="questionContainer">
+            <p style="text-align: center; color: var(--text);">Loading questions...</p>
+        </div>
+
+        <div class="navigation">
+            <button id="prevBtn" class="btn btn-outline" disabled>← Previous</button>
+            <button id="submitBtn" class="btn btn-success" style="display: none; background: var(--success); color: white;">Submit Assessment</button>
+            <button id="nextBtn" class="btn btn-primary" style="color: white;">Next →</button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    let assessment = null;
+    let currentQuestionIndex = 0;
+    let userAnswers = {};
+    let startTime = null;
+    let timerInterval = null;
+
+    async function loadAssessment() {
+        const assessmentId = new URLSearchParams(window.location.search).get('assessment_id');
+        const childId = new URLSearchParams(window.location.search).get('child_id');
+        const token = localStorage.getItem('access_token');
+
+        if (!assessmentId || !childId) {
+            document.getElementById('questionContainer').innerHTML = '<p style="color: var(--danger);">Missing assessment or child ID.</p>';
+            return;
+        }
+
+        try {
+            const response = await fetch(`/api/assessments/${assessmentId}/`);
+            if (response.ok) {
+                assessment = await response.json();
+                initializeTest();
+            }
+        } catch (err) {
+            console.error('Error:', err);
+            document.getElementById('questionContainer').innerHTML = '<p style="color: var(--danger);">Failed to load assessment.</p>';
+        }
+    }
+
+    function initializeTest() {
+        document.getElementById('assessmentTitle').textContent = assessment.title;
+        
+        const allQuestions = assessment.sections?.flatMap(s => s.questions) || [];
+        document.getElementById('totalQuestions').textContent = allQuestions.length;
+
+        startTime = Date.now();
+        startTimer();
+        displayQuestion();
+    }
+
+    function startTimer() {
+        timerInterval = setInterval(() => {
+            const elapsed = Math.floor((Date.now() - startTime) / 1000);
+            const minutes = Math.floor(elapsed / 60);
+            const seconds = elapsed % 60;
+            document.getElementById('timerText').textContent = 
+                `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+        }, 1000);
+    }
+
+    function displayQuestion() {
+        const allQuestions = assessment.sections?.flatMap(s => s.questions) || [];
+        const question = allQuestions[currentQuestionIndex];
+
+        if (!question) return;
+
+        document.getElementById('currentQuestion').textContent = currentQuestionIndex + 1;
+        const progress = ((currentQuestionIndex + 1) / allQuestions.length) * 100;
+        document.getElementById('progressFill').style.width = progress + '%';
+
+        let optionsHtml = '';
+        if (question.type === 'mcq' && question.options) {
+            const options = Array.isArray(question.options) ? question.options : 
+                           (question.options.options || []);
+            
+            optionsHtml = options.map((opt, idx) => `
+                <label class="option">
+                    <input type="radio" name="answer" value="${idx}" 
+                           ${userAnswers[question.id] == idx ? 'checked' : ''}
+                           onchange="handleAnswer(${question.id}, ${idx})">
+                    <span>${opt}</span>
+                </label>
+            `).join('');
+        }
+
+        document.getElementById('questionContainer').innerHTML = `
+            <div class="question-text">${question.text}</div>
+            ${question.media_url ? `<img src="${question.media_url}" style="max-width: 100%; margin-bottom: 1rem; border-radius: 0.5rem;">` : ''}
+            <div class="options">${optionsHtml}</div>
+        `;
+
+        // Update navigation buttons
+        document.getElementById('prevBtn').disabled = currentQuestionIndex === 0;
+        document.getElementById('nextBtn').style.display = currentQuestionIndex < allQuestions.length - 1 ? 'block' : 'none';
+        document.getElementById('submitBtn').style.display = currentQuestionIndex === allQuestions.length - 1 ? 'block' : 'none';
+
+        updateOptionClasses();
+    }
+
+    function handleAnswer(questionId, answer) {
+        userAnswers[questionId] = answer;
+        updateOptionClasses();
+    }
+
+    function updateOptionClasses() {
+        document.querySelectorAll('.option input[type="radio"]:checked').forEach(el => {
+            el.closest('.option').classList.add('selected');
+        });
+        document.querySelectorAll('.option input[type="radio"]:not(:checked)').forEach(el => {
+            el.closest('.option').classList.remove('selected');
+        });
+    }
+
+    document.getElementById('nextBtn').addEventListener('click', () => {
+        const allQuestions = assessment.sections?.flatMap(s => s.questions) || [];
+        if (currentQuestionIndex < allQuestions.length - 1) {
+            currentQuestionIndex++;
+            displayQuestion();
+        }
+    });
+
+    document.getElementById('prevBtn').addEventListener('click', () => {
+        if (currentQuestionIndex > 0) {
+            currentQuestionIndex--;
+            displayQuestion();
+        }
+    });
+
+    document.getElementById('submitBtn').addEventListener('click', async () => {
+        clearInterval(timerInterval);
+        const childId = new URLSearchParams(window.location.search).get('child_id');
+        const token = localStorage.getItem('access_token');
+
+        const answers = Object.entries(userAnswers).map(([qid, answer]) => ({
+            question: qid,
+            answer: answer
+        }));
+
+        try {
+            // Start assessment session
+            const sessionRes = await fetch(`/api/assessments/${assessment.id}/start/`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`,
+                    'X-CSRFToken': document.querySelector('[name="csrfmiddlewaretoken"]')?.value || ''
+                },
+                body: JSON.stringify({ child_id: childId })
+            });
+
+            if (!sessionRes.ok) throw new Error('Failed to start session');
+            const session = await sessionRes.json();
+            const sessionId = session.session_id;
+
+            // Submit answers
+            await fetch(`/api/sessions/${sessionId}/answer/`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`,
+                    'X-CSRFToken': document.querySelector('[name="csrfmiddlewaretoken"]')?.value || ''
+                },
+                body: JSON.stringify({ answers })
+            });
+
+            // Complete assessment
+            await fetch(`/api/sessions/${sessionId}/complete/`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'X-CSRFToken': document.querySelector('[name="csrfmiddlewaretoken"]')?.value || ''
+                }
+            });
+
+            window.location.href = `/results/${sessionId}/`;
+        } catch (err) {
+            console.error('Error:', err);
+            alert('Failed to submit assessment. Please try again.');
+        }
+    });
+
+    loadAssessment();
+</script>
+{% endblock %}

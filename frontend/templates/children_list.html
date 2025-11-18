@@ -1,0 +1,84 @@
+{% extends "base.html" %}
+
+{% block title %}My Children - KidAptitude{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin: 2rem 0;">
+        <h1 style="color: var(--primary);">My Children</h1>
+        <a href="/children/add/" class="btn btn-primary" style="color: white;">+ Add Child</a>
+    </div>
+
+    <div id="childrenList" class="grid grid-2" style="margin-bottom: 2rem;">
+        <p style="grid-column: 1 / -1;">Loading...</p>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    async function loadChildren() {
+        const token = localStorage.getItem('access_token');
+        
+        try {
+            const response = await fetch('/api/children/', {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+
+            if (response.ok) {
+                const children = await response.json();
+                displayChildren(children);
+            } else if (response.status === 401) {
+                window.location.href = '/login/';
+            }
+        } catch (err) {
+            console.error('Error:', err);
+            document.getElementById('childrenList').innerHTML = '<p style="color: var(--danger); grid-column: 1 / -1;">Failed to load children. Please refresh.</p>';
+        }
+    }
+
+    function displayChildren(children) {
+        const container = document.getElementById('childrenList');
+        
+        if (!children || children.length === 0) {
+            container.innerHTML = `
+                <div class="card" style="grid-column: 1 / -1; text-align: center;">
+                    <p style="margin-bottom: 1rem;">No children added yet.</p>
+                    <a href="/children/add/" class="btn btn-primary" style="color: white;">Add Your First Child</a>
+                </div>
+            `;
+            return;
+        }
+
+        const html = children.map(child => `
+            <div class="card">
+                <h3>${child.first_name} ${child.last_name}</h3>
+                <p>
+                    <strong>Grade:</strong> ${child.grade || 'N/A'} <br>
+                    <strong>Age:</strong> ${calculateAge(child.dob)} years
+                </p>
+                <div style="display: flex; gap: 1rem; margin-top: 1rem;">
+                    <a href="/children/edit/${child.id}/" class="btn btn-outline">Edit</a>
+                    <a href="/children/${child.id}/assessments/" class="btn btn-primary" style="color: white;">Start Test</a>
+                </div>
+            </div>
+        `).join('');
+
+        container.innerHTML = html;
+    }
+
+    function calculateAge(dob) {
+        if (!dob) return 'Unknown';
+        const birthDate = new Date(dob);
+        const today = new Date();
+        let age = today.getFullYear() - birthDate.getFullYear();
+        const monthDiff = today.getMonth() - birthDate.getMonth();
+        if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+            age--;
+        }
+        return age;
+    }
+
+    loadChildren();
+</script>
+{% endblock %}

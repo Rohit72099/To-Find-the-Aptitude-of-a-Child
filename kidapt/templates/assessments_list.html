@@ -1,0 +1,91 @@
+{% extends "base.html" %}
+
+{% block title %}Assessments - KidAptitude{% endblock %}
+
+{% block content %}
+<div class="container">
+    <h1 style="color: var(--primary); margin: 2rem 0;">Available Assessments</h1>
+
+    <div style="display: flex; gap: 1rem; margin-bottom: 2rem; flex-wrap: wrap;">
+        <input type="text" id="searchInput" placeholder="Search assessments..." style="padding: 0.75rem; border: 1px solid var(--border); border-radius: 0.5rem; flex: 1; min-width: 200px;">
+        <select id="filterAge" style="padding: 0.75rem; border: 1px solid var(--border); border-radius: 0.5rem;">
+            <option value="">All ages</option>
+            <option value="5-8">5-8 years</option>
+            <option value="9-12">9-12 years</option>
+            <option value="13-16">13-16 years</option>
+            <option value="17+">17+ years</option>
+        </select>
+    </div>
+
+    <div id="assessmentsList" class="grid grid-2" style="margin-bottom: 2rem;">
+        <p style="grid-column: 1 / -1;">Loading assessments...</p>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    let allAssessments = [];
+
+    async function loadAssessments() {
+        try {
+            const response = await fetch('/api/assessments/');
+            if (response.ok) {
+                allAssessments = await response.json();
+                displayAssessments(allAssessments);
+            }
+        } catch (err) {
+            console.error('Error:', err);
+            document.getElementById('assessmentsList').innerHTML = '<p style="grid-column: 1 / -1; color: var(--danger);">Failed to load assessments.</p>';
+        }
+    }
+
+    function displayAssessments(assessments) {
+        const container = document.getElementById('assessmentsList');
+        
+        if (!assessments || assessments.length === 0) {
+            container.innerHTML = '<p style="grid-column: 1 / -1;">No assessments available.</p>';
+            return;
+        }
+
+        const html = assessments.map(assessment => `
+            <div class="card">
+                <h3>${assessment.title}</h3>
+                <p>${assessment.description || 'N/A'}</p>
+                <p style="font-size: 0.9rem; color: #6b7280;">
+                    <strong>Age Range:</strong> ${assessment.age_min || '?'} - ${assessment.age_max || '?'} years <br>
+                    <strong>Duration:</strong> ${assessment.time_limit ? assessment.time_limit + ' min' : 'Variable'}
+                </p>
+                <a href="/assessments/${assessment.id}/start/" class="btn btn-primary" style="display: block; width: 100%; text-align: center; color: white; margin-top: 1rem;">Start Assessment</a>
+            </div>
+        `).join('');
+
+        container.innerHTML = html;
+    }
+
+    function filterAssessments() {
+        const searchTerm = document.getElementById('searchInput').value.toLowerCase();
+        const ageFilter = document.getElementById('filterAge').value;
+
+        let filtered = allAssessments.filter(a => {
+            const matchesSearch = a.title.toLowerCase().includes(searchTerm) || 
+                                 (a.description || '').toLowerCase().includes(searchTerm);
+            let matchesAge = true;
+
+            if (ageFilter) {
+                const [min, max] = ageFilter.split('-').map(x => parseInt(x) || Infinity);
+                matchesAge = (a.age_min || 0) <= max && (a.age_max || Infinity) >= min;
+            }
+
+            return matchesSearch && matchesAge;
+        });
+
+        displayAssessments(filtered);
+    }
+
+    document.getElementById('searchInput').addEventListener('input', filterAssessments);
+    document.getElementById('filterAge').addEventListener('change', filterAssessments);
+
+    loadAssessments();
+</script>
+{% endblock %}

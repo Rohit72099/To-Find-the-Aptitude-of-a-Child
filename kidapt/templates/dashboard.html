@@ -1,0 +1,107 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - KidAptitude{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin: 2rem 0;">
+        <h1 style="color: var(--primary);">Welcome, {{ user.first_name|default:user.username }}!</h1>
+        <a href="/children/add/" class="btn btn-primary" style="color: white;">+ Add Child</a>
+    </div>
+
+    <div class="grid grid-2" style="margin-bottom: 3rem;">
+        <div class="card">
+            <h3>📝 Your Children</h3>
+            <p id="childrenCount">Loading...</p>
+            <a href="/children/" style="color: var(--primary); text-decoration: none; font-weight: 600;">View all →</a>
+        </div>
+        <div class="card">
+            <h3>📊 Recent Assessments</h3>
+            <p id="assessmentCount">Loading...</p>
+            <a href="/assessments/" style="color: var(--primary); text-decoration: none; font-weight: 600;">Browse assessments →</a>
+        </div>
+    </div>
+
+    <section style="margin-bottom: 3rem;">
+        <h2 style="margin-bottom: 1.5rem; color: var(--dark);">Recent Assessment Results</h2>
+        <div id="recentResults" style="min-height: 100px;">Loading...</div>
+    </section>
+
+    <section>
+        <h2 style="margin-bottom: 1.5rem; color: var(--dark);">Next Steps</h2>
+        <div class="grid grid-3">
+            <div class="card">
+                <h4>1. Add Your Children</h4>
+                <p>Create profiles for your children with their basic information.</p>
+                <a href="/children/add/" class="btn btn-outline">Get Started</a>
+            </div>
+            <div class="card">
+                <h4>2. Choose Assessments</h4>
+                <p>Browse available tests tailored to your child's age and interests.</p>
+                <a href="/assessments/" class="btn btn-outline">Explore</a>
+            </div>
+            <div class="card">
+                <h4>3. Review Results</h4>
+                <p>Get detailed insights and personalized recommendations for your child.</p>
+                <a href="/results/" class="btn btn-outline">View Reports</a>
+            </div>
+        </div>
+    </section>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    async function loadDashboardData() {
+        const token = localStorage.getItem('access_token');
+        
+        try {
+            // Load children count
+            const childrenRes = await fetch('/api/children/', {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            if (childrenRes.ok) {
+                const children = await childrenRes.json();
+                const count = Array.isArray(children) ? children.length : 0;
+                document.getElementById('childrenCount').textContent = `You have ${count} child${count !== 1 ? 'ren' : ''}.`;
+            }
+
+            // Load recent results
+            const resultsRes = await fetch('/api/sessions/', {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            if (resultsRes.ok) {
+                const results = await resultsRes.json();
+                displayResults(results);
+            }
+        } catch (err) {
+            console.error('Error loading dashboard:', err);
+            document.getElementById('recentResults').innerHTML = '<p style="color: var(--danger);">Failed to load data. Please refresh.</p>';
+        }
+    }
+
+    function displayResults(results) {
+        const container = document.getElementById('recentResults');
+        if (!results || results.length === 0) {
+            container.innerHTML = '<p style="color: var(--text);">No assessments taken yet. <a href="/assessments/" style="color: var(--primary);">Start one now</a></p>';
+            return;
+        }
+
+        const html = results.slice(0, 3).map(result => `
+            <div class="card">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <div>
+                        <h4>${result.assessment_title}</h4>
+                        <p style="font-size: 0.9rem; color: #6b7280;">Score: ${result.raw_scores?.score || 'N/A'}</p>
+                    </div>
+                    <a href="/results/${result.id}/" class="btn btn-primary" style="color: white;">View</a>
+                </div>
+            </div>
+        `).join('');
+        
+        container.innerHTML = html;
+    }
+
+    loadDashboardData();
+</script>
+{% endblock %}
