@@ -3,29 +3,15 @@ from pathlib import Path
 from datetime import timedelta
 from dotenv import load_dotenv
 
-# Try to import dj_database_url if available (for production/Render)
-try:
-    import dj_database_url
-    HAS_DJ_DATABASE_URL = True
-except ImportError:
-    HAS_DJ_DATABASE_URL = False
-
 load_dotenv()
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-# ------------------------------
-# Security & Debug
-# ------------------------------
 SECRET_KEY = os.getenv('SECRET_KEY', 'dev-secret')
+DEBUG = os.getenv('DEBUG', 'True') == 'True'
+ALLOWED_HOSTS = [h.strip() for h in os.getenv('ALLOWED_HOSTS', 'localhost,127.0.0.1,0.0.0.0').split(',') if h.strip()]
 
-DEBUG = os.getenv('DEBUG', 'False') == 'True'
 
-ALLOWED_HOSTS = os.getenv("ALLOWED_HOSTS", "*").split(",")
-
-# ------------------------------
-# Installed Apps
-# ------------------------------
 INSTALLED_APPS = [
     'django.contrib.admin',
     'django.contrib.auth',
@@ -33,22 +19,14 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-
     'rest_framework',
-    'rest_framework_simplejwt',
-
     'users',
     'assessments',
     'frontend',
 ]
 
-# ------------------------------
-# Middleware (with WhiteNoise)
-# ------------------------------
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
-    'whitenoise.middleware.WhiteNoiseMiddleware',
-
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -57,38 +35,20 @@ MIDDLEWARE = [
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
 
-# ------------------------------
-# URL & WSGI
-# ------------------------------
 ROOT_URLCONF = 'kidapt.urls'
 WSGI_APPLICATION = 'kidapt.wsgi.application'
 
-# ------------------------------
-# Database (Auto-switch: SQLite → Postgres on Render)
-# ------------------------------
-DATABASE_URL = os.getenv("DATABASE_URL")
-
-if HAS_DJ_DATABASE_URL and DATABASE_URL:
-    # Use Postgres on Render/Production
-    DATABASES = {
-        "default": dj_database_url.parse(DATABASE_URL, conn_max_age=600)
+DATABASES = {
+    'default': {
+        'ENGINE': 'django.db.backends.sqlite3',
+        'NAME': BASE_DIR / 'db.sqlite3',
     }
-else:
-    # Use SQLite locally
-    DATABASES = {
-        'default': {
-            'ENGINE': 'django.db.backends.sqlite3',
-            'NAME': BASE_DIR / 'db.sqlite3',
-        }
-    }
+}
 
-# ------------------------------
-# Templates
-# ------------------------------
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [BASE_DIR / "frontend" / "templates"],
+        'DIRS': [],
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
@@ -101,18 +61,17 @@ TEMPLATES = [
     },
 ]
 
-# ------------------------------
-# Static Files (Render Required)
-# ------------------------------
-STATIC_URL = '/static/'
-STATIC_ROOT = BASE_DIR / 'staticfiles'     # REQUIRED FOR RENDER
-STATICFILES_DIRS = [BASE_DIR / "frontend" / "static"]
+STATIC_URL = 'static/'
 
-STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
+AUTH_PASSWORD_VALIDATORS = []
 
-# ------------------------------
-# Authentication / JWT
-# ------------------------------
+LANGUAGE_CODE = 'en-us'
+TIME_ZONE = 'UTC'
+USE_I18N = True
+USE_TZ = True
+
+DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': (
         'rest_framework.authentication.SessionAuthentication',
@@ -127,13 +86,3 @@ SIMPLE_JWT = {
     'ACCESS_TOKEN_LIFETIME': timedelta(hours=2),
     'AUTH_HEADER_TYPES': ('Bearer',),
 }
-
-# ------------------------------
-# Misc
-# ------------------------------
-LANGUAGE_CODE = 'en-us'
-TIME_ZONE = 'UTC'
-USE_I18N = True
-USE_TZ = True
-
-DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'

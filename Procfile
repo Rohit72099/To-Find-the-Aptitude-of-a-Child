@@ -1,1 +1,1 @@
-web: gunicorn kidapt.wsgi:application --log-file -
+web: gunicorn kidapt.wsgi
